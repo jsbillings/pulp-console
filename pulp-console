@@ -1,0 +1,101 @@
+#!/usr/bin/python -Ott
+""" Python client API console for Pulp """
+
+import sys
+from pulp.client.admin.credentials import Login as LoginBundle
+from pulp.client.api.repository import RepositoryAPI
+from pulp.client.api.user import UserAPI
+from pulp.client.api.task import TaskAPI
+from pulp.client.api.service import ServiceAPI
+from pulp.common.dateutils import format_iso8601_datetime, \
+     format_iso8601_interval
+from pulp.client.api import server as ServerAPI
+from pulp.client.consumer.config import ConsumerConfig
+from pulp.client.lib.utils import parse_interval_schedule
+from code import InteractiveConsole
+
+try:
+    import pulp.server.config as ServerConfig
+    has_admin = True
+except RuntimeError:
+    has_admin = False
+
+try:
+    import IPython
+    has_ipython = True
+except ImportError:
+    has_ipython = False
+
+def pulp_user_login():
+    """ attempt to login with the cert that already exists for the user """
+    lbundle = LoginBundle()
+    repoapi = RepositoryAPI()
+    print("Trying login with %s" % lbundle.crtpath())
+    try:
+        ServerAPI.active_server.set_ssl_credentials(lbundle.crtpath())
+
+        # setting creds doesn't raise an error if the creds are
+        # invalid; we have to actually try to perform an operation
+        # before we know our 'login' was successful
+        repoapi.repositories(dict())
+        return True
+    except (ServerAPI.ServerRequestError, RuntimeError), err:
+        print(err)
+        return False
+
+def pulp_admin_login():
+    """ try to login with the default login information in pulp.conf """
+    if not has_admin:
+        return False
+    userapi = UserAPI()
+    lbundle = LoginBundle()
+    cfg = ServerConfig.config
+
+    print("Trying login as %s" % cfg.get("server", "default_login"))
+    try:
+        ServerAPI.active_server.set_basic_auth_credentials(cfg.get("server",
+                                                                "default_login"),
+                                                           cfg.get("server",
+                                                                   "default_password"))
+        crt = userapi.admin_certificate()
+        print("Storing auth certificate at %s" % lbundle.crtpath())
+        lbundle.write(crt)
+        return True
+    except ServerAPI.ServerRequestError, err:
+        print(err)
+        return False
+
+def setup_pulp():
+    """ instantiate pulp server object and log in """
+    config = ConsumerConfig()
+    serveropts = config.server
+    print("Connecting to Pulp server at %s://%s:%s%s" % (serveropts['scheme'],
+                                                         serveropts['host'],
+                                                         serveropts['port'],
+                                                         serveropts['path']))
+    pulpserver = ServerAPI.PulpServer(serveropts['host'],
+                                      int(serveropts['port']),
+                                      serveropts['scheme'],
+                                      serveropts['path'])
+    ServerAPI.set_active_server(pulpserver)
+
+    if not pulp_user_login() and not pulp_admin_login():
+        print("Could not authenticate to Pulp; run 'pulp-admin auth login'")
+        raise SystemExit(1)
+
+def main():
+    setup_pulp()
+    repoapi = RepositoryAPI()
+    userapi = UserAPI()
+    taskapi = TaskAPI()
+    serviceapi = ServiceAPI()
+    server = ServerAPI.active_server
+    if has_ipython:
+        shell = IPython.Shell.IPShell(argv=[], user_ns=locals())
+        shell.mainloop()
+    else:
+        cons = InteractiveConsole(locals())
+        cons.interact()
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,18 @@
+pulp-console is an interactive Python shell for the Pulp client APIs.
+It uses IPython if installed, or the default Python shell if not.  It
+will attempt to use an existing stored Pulp authentication certificate
+if one exists; if not, it will attempt to read the Pulp admin username
+and password from /etc/pulp/pulp.conf and log in using that.
+
+Once the console is started, you have an active Pulp login, and the
+following variables defined:
+
+* repoapi: A pulp.client.api.repository.RepositoryAPI instance
+* userapi: A pulp.client.api.user.UserAPI instance
+* taskapi: A pulp.client.api.task.TaskAPI instance
+* serviceapi: A pulp.client.api.service.ServiceAPI instance
+* server: A pulp.client.api.server.Server instance, the same as pulp.client.api.server.active_server
+
+It differs from pic.py, the Pulp Interactive Console, that ships with
+Pulp in that pic.py is a console for the REST APIs, not the Python
+client APIs.
