@@ -11,6 +11,7 @@ following variables defined:
 * userapi: A pulp.client.api.user.UserAPI instance
 * taskapi: A pulp.client.api.task.TaskAPI instance
 * serviceapi: A pulp.client.api.service.ServiceAPI instance
+* filterapi: A pulp.client.api.filter.FilterAPI instance
 * server: A pulp.client.api.server.Server instance, the same as pulp.client.api.server.active_server
 
 It differs from pic.py, the Pulp Interactive Console, that ships with
