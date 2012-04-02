@@ -92,9 +92,11 @@ def main():
     serviceapi = ServiceAPI()
     filterapi = FilterAPI()
     server = ServerAPI.active_server
-    if has_ipython:
+    if has_ipython and hasattr(IPython, "Shell"):
         shell = IPython.Shell.IPShell(argv=[], user_ns=locals())
         shell.mainloop()
+    elif has_ipython and hasattr(IPython, "embed"):
+        IPython.embed(user_ns=locals())
     else:
         cons = InteractiveConsole(locals())
         cons.interact()
