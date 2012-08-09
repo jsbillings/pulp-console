@@ -14,6 +14,7 @@ from pulp.client.api import server as ServerAPI
 from pulp.client.consumer.config import ConsumerConfig
 from pulp.client.lib.utils import parse_interval_schedule
 from code import InteractiveConsole
+from optparse import OptionParser
 
 try:
     import pulp.server.config as ServerConfig
@@ -21,11 +22,36 @@ try:
 except RuntimeError:
     has_admin = False
 
-try:
-    import IPython
-    has_ipython = True
-except ImportError:
-    has_ipython = False
+def load_interpreters():
+    interpreters = dict(python=lambda v: InteractiveConsole(v).interact())
+    best = "python"
+    try:
+        import bpython.cli
+        interpreters["bpython"] = lambda v: bpython.cli.main(args=[], locals_=v)
+        best = "bpython"
+    except ImportError:
+        pass
+            
+    try:
+        # whether ipython is actually better than bpython is
+        # up for debate, but this is the behavior that existed
+        # before --interpreter was added, so we call IPython
+        # better
+        import IPython
+        if hasattr(IPython, "Shell"):
+            interpreters["ipython"] = lambda v: \
+                IPython.Shell.IPShell(argv=[], user_ns=v).mainloop()
+            best = "ipython"
+        elif hasattr(IPython, "embed"):
+            interpreters["ipython"] = lambda v: IPython.embed(user_ns=v)
+            best = "ipython"
+        else:
+            print("Unknown IPython API version")
+    except ImportError:
+        pass
+
+    interpreters['best'] = interpreters[best]
+    return interpreters
 
 def pulp_user_login():
     """ attempt to login with the cert that already exists for the user """
@@ -85,6 +111,15 @@ def setup_pulp():
         raise SystemExit(1)
 
 def main():
+    interpreters = load_interpreters()
+
+    parser = OptionParser()
+    parser.add_option("-i", "--interpreter",
+                      help="Use the specified interpreter",
+                      action="store", default="best",
+                      choices=interpreters.keys())
+    (options, args) = parser.parse_args()
+
     setup_pulp()
     repoapi = RepositoryAPI()
     userapi = UserAPI()
@@ -92,14 +127,7 @@ def main():
     serviceapi = ServiceAPI()
     filterapi = FilterAPI()
     server = ServerAPI.active_server
-    if has_ipython and hasattr(IPython, "Shell"):
-        shell = IPython.Shell.IPShell(argv=[], user_ns=locals())
-        shell.mainloop()
-    elif has_ipython and hasattr(IPython, "embed"):
-        IPython.embed(user_ns=locals())
-    else:
-        cons = InteractiveConsole(locals())
-        cons.interact()
+    return interpreters[options.interpreter](locals())
 
 if __name__ == "__main__":
     sys.exit(main())
